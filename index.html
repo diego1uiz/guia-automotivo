@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guia de Empresas Automotivas - Teresina</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    
+    <style>
+        /* 2. ESTILIZAÇÃO GERAL DA PÁGINA (RESET E TIPOGRAFIA) */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box; /* Garante que padding e borders não alterem o tamanho final dos blocos */
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f5f5f5; /* Fundo cinza claro para destacar os cartões brancos */
+            color: #333;
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: #1a5276; /* Azul escuro institucional */
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2.2em;
+            margin-bottom: 8px;
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* 3. SEÇÃO DO MAPA COLETIVO */
+        .map-section {
+            background-color: white;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .map-section h2 {
+            color: #1a5276;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #1a5276;
+            padding-bottom: 5px;
+        }
+
+        /* O contêiner do mapa DEVE ter uma altura definida, senão ele não aparece na tela */
+        #mapa-geral {
+            width: 100%;
+            height: 450px;
+            border-radius: 6px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.15); /* Sombra interna para dar profundidade */
+            z-index: 1; /* Garante que o mapa fique abaixo de menus ou modais se houver */
+        }
+
+        /* 4. GRADE DE CARDS (SELEÇÃO DE EMPRESAS) */
+        .companies-grid {
+            display: grid;
+            /* Cria colunas automáticas que se ajustam ao tamanho da tela (mínimo de 280px por card) */
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 35px;
+        }
+
+        .company-select-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+            border: 2px solid transparent; /* Reserva o espaço da borda para não deslocar o layout no hover */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Efeito visual de levantamento ao passar o mouse */
+        .company-select-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+            border-color: #1a5276;
+        }
+
+        /* Classe injetada pelo JavaScript quando o card correspondente está ativo/aberto */
+        .company-select-card.active {
+            border-color: #2e4053;
+            background-color: #ebf5fb; /* Fundo azul bem claro */
+        }
+
+        .company-select-card img {
+            max-width: 150px;
+            max-height: 80px;
+            object-fit: contain; /* Mantém a proporção da logo sem distorcer */
+            margin-bottom: 15px;
+        }
+
+        .company-select-card h3 {
+            color: #1a5276;
+            font-size: 1.2em;
+        }
+
+        /* 5. PAINEL DE DETALHES DINÂMICOS */
+        .details-section {
+            background-color: white;
+            padding: 30px;
+            margin-bottom: 40px;
+            border-radius: 8px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            display: none; /* Começa oculto por padrão; alterado para 'block' via JS */
+            animation: fadeIn 0.4s ease-in-out; /* Efeito suave de surgimento */
+        }
+
+        /* Animação de surgimento esmaecido */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .details-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            border-bottom: 2px solid #1a5276;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .details-header img {
+            max-width: 120px;
+            max-height: 60px;
+            object-fit: contain;
+        }
+
+        .details-header h2 {
+            color: #1a5276;
+            font-size: 1.8em;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr; /* Divisão: 2 partes para textos, 1 parte para serviços */
+            gap: 30px;
+        }
+
+        .info-block h3, .products-block h3 {
+            color: #1a5276;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .info-block p {
+            color: #555;
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+
+        .contact-list {
+            list-style: none;
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #1a5276; /* Detalhe em linha azul na lateral esquerda */
+        }
+
+        .contact-list li {
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        .contact-list li:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Botão de redirecionamento para o Google Maps */
+        .map-link-btn {
+            display: inline-block;
+            margin-top: 5px;
+            color: #1a5276;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 0.9em;
+            transition: color 0.2s;
+        }
+
+        .map-link-btn:hover {
+            color: #e74c3c; /* Muda para vermelho no hover */
+            text-decoration: underline;
+        }
+
+        .products-list {
+            list-style: none;
+        }
+
+        .products-list li {
+            background-color: #f0f4f8; /* Fundo cinza/azul para simular pequenas tags */
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            color: #2e4053;
+            font-weight: bold;
+            font-size: 0.95em;
+        }
+
+        /* 6. GEOMETRIA CSS PURA PARA O PIN DE LOCALIZAÇÃO */
+        /* Contêiner invisível que centraliza o pin no ponto do mapa */
+        .pin-marker-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 50px;
+            height: 50px;
+        }
+
+        /* Criação do formato de gota invertida utilizando apenas CSS */
+        .custom-pin {
+            width: 44px;
+            height: 44px;
+            border-radius: 50% 50% 50% 0; /* Arredonda 3 cantos e deixa um pontudo */
+            background: #1a5276; /* Cor azul inicial do Pin */
+            position: absolute;
+            transform: rotate(-45deg); /* Rotaciona para o bico apontar exatamente para baixo */
+            left: 50%;
+            top: 50%;
+            margin: -22px 0 0 -22px; /* Centraliza geometricamente no eixo */
+            box-shadow: -2px 2px 4px rgba(0,0,0,0.35); /* Projeta sombra realista na diagonal */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: background-color 0.3s; /* Transição suave na mudança de cor */
+        }
+
+        /* Círculo interno branco onde a logo fica inserida */
+        .pin-circle {
+            width: 32px;
+            height: 32px;
+            background: white;
+            border-radius: 50%;
+            transform: rotate(45deg); /* Aplica rotação inversa para anular os -45° da gota e deixar a logo reta */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; /* Corta as bordas da logo para assumirem o formato circular */
+            padding: 2px;
+            box-shadow: inset 0 0 4px rgba(0,0,0,0.2); /* Sombra interna para dar profundidade */
+        }
+
+        .pin-circle img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* Encaixa a logo perfeitamente dentro do círculo */
+            border-radius: 50%;
+        }
+
+        /* Altera dinamicamente o fundo do pin para Vermelho quando ele recebe a classe ativa via JS */
+        .pin-marker-container.pin-active .custom-pin {
+            background: #e74c3c;
+        }
+
+        /* 7. BALÃO DE INFORMAÇÕES DO MAPA (LEAFLET POPUP) */
+        .leaflet-popup-content {
+            text-align: center;
+            font-family: 'Arial', sans-serif;
+        }
+        .leaflet-popup-content img {
+            max-width: 100px;
+            max-height: 40px;
+            object-fit: contain;
+            margin-bottom: 5px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .leaflet-popup-content strong {
+            color: #1a5276;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        footer {
+            background-color: #1a5276;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin-top: 40px;
+        }
+
+        /* Ajustes de responsividade para celulares */
+        @media (max-width: 768px) {
+            .details-grid {
+                grid-template-columns: 1fr; /* Transforma as colunas em uma lista de bloco único */
+            }
+            #mapa-geral {
+                height: 350px;
+            }
+            .details-header {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Rede de Serviços Automotivos</h1>
+        <p>Encontre a melhor solução para o seu veículo em Teresina</p>
+    </header>
+
+    <div class="container">
+        
+        <div class="map-section">
+            <h2>Mapa de Localização</h2>
+            <div id="mapa-geral"></div>
+        </div>
+
+        <h2 style="color: #1a5276; margin-bottom: 15px;">🏢 Nossas Empresas</h2>
+        <div class="companies-grid" id="grid-empresas"></div>
+
+        <div class="details-section" id="painel-detalhes">
+            <div class="details-header">
+                <img id="detalhe-logo" src="" alt="Logo da Empresa">
+                <h2 id="detalhe-nome">Nome da Empresa</h2>
+            </div>
+            <div class="details-grid">
+                <div class="info-block">
+                    <h3>Sobre a Empresa</h3>
+                    <p id="detalhe-descricao">Descrição da empresa...</p>
+                    
+                    <h3>Contatos e Localização</h3>
+                    <ul class="contact-list">
+                        <li><strong>📍 Endereço:</strong> <span id="detalhe-endereco"></span></li>
+                        <li><strong>📞 Telefone:</strong> <span id="detalhe-telefone"></span></li>
+                        <li><strong>📧 E-mail:</strong> <span id="detalhe-email"></span></li>
+                        <li style="margin-top: 5px; list-style: none;">
+                            <a id="detalhe-gmaps" href="#" target="_blank" class="map-link-btn">🗺️ Ver no Google Maps</a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="products-block">
+                    <h3>Produtos & Serviços</h3>
+                    <ul class="products-list" id="detalhe-produtos"></ul>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <footer>
+        <p>© 2026 - Catálogo Automotivo de Teresina. Todos os direitos reservados.</p>
+    </footer>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script>
+        // 9. BANCO DE DADOS LOCAL (ARRAY DE OBJETOS)
+        // Centraliza todas as informações enviadas por você
+        const empresas = [
+            {
+                id: 1,
+                nome: "Mossoró Peças",
+                endereco: "Av. Miguel Rosa, 4700 - Piçarra, Teresina - PI, 64002-850",
+                telefone: "08631338250",
+                email: "Contato por telefone",
+                produtos: ["Pneus", "Peças automotivas em geral", "Suporte técnico"],
+                descricao: "Mais de 30 anos movendo você com segurança e qualidade. Com um estoque completo, oferecemos peças para todos os modelos e marcas de veículos. Se você precisa de componentes para manutenção, reposição ou melhoria no desempenho do seu automóvel. Contamos com uma equipe altamente qualificada e sempre pronta para entender as suas necessidades. Com atendimento rápido e eficaz, garantimos que você saia satisfeito e bem informado sobre as opções mais adequadas para o seu veículo. Em pontos estratégicos de Teresina, garantindo mais rapidez no atendimento, facilidade de acesso e agilidade na entrega das peças que você precisa.",
+                logo: "/logos/logo_mossoro.png",
+                coordenadas: [-5.100247318954445, -42.803878616112314],
+                gmaps: "https://maps.app.goo.gl/cNHA5YCmmDLwdSn86" // Link Real Enviado
+            },
+            {
+                id: 2,
+                nome: "SERVICAR",
+                endereco: "R. Sergipe, 965 - Pirajá, Teresina - PI, 64003-720",
+                telefone: "08632172400",
+                email: "Contato por telefone",
+                produtos: ["Pintura", "Estética", "Automação"],
+                descricao: "Empresa do ramo de serviços automotivos.",
+                logo: "/logos/logo_servicar.png",
+                coordenadas: [-5.073384888943555, -42.82554277895221],
+                gmaps: "https://maps.app.goo.gl/V1UCt6TrAXUPSNNd7" // Link Real Enviado
+            },
+            {
+                id: 3,
+                nome: "Auto Peças Rode Bem",
+                endereco: "Av. Zequinha Freire, 2059 - Santa Lia, Teresina - PI, 64053-400",
+                telefone: "08632303807",
+                email: "Contato por telefone",
+                produtos: ["Peças para motocicletas", "Peças para automóveis", "Peças para manutenção"],
+                descricao: "Empresa no ramo de peças automotivas.",
+                logo: "/logos/logo_rodebem.jfif",
+                coordenadas: [-5.060762063621375, -42.749043465400916],
+                gmaps: "https://maps.app.goo.gl/sxECGCToqwirgoTi6" // Link Real Enviado
+            }
+        ];
+
+        // VARIÁVEL DE CONTROLE: Armazena o ID da empresa aberta (null significa que nenhuma está aberta)
+        let empresaAtivaId = null;
+
+        // 10. INICIALIZAÇÃO DO MAPA BASE VIA LEAFLET
+        // Cria o mapa na div 'mapa-geral', centraliza em Teresina [-5.08921, -42.8016] com Zoom nível 13
+        const mapa = L.map('mapa-geral').setView([-5.08921, -42.8016], 13);
+
+        // Aplica as peças de imagem (Tiles) do modelo minimalista CartoDB Positron
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap contributors © CARTO',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(mapa);
+
+        // Dicionário global para guardar a referência dos marcadores e conseguir abri-los remotamente por código
+        const marcadoresMapa = {};
+        const gridEmpresas = document.getElementById('grid-empresas');
+
+        // 11. LAÇO DE REPETIÇÃO: RENDERIZAÇÃO AUTOMÁTICA DOS ELEMENTOS
+        empresas.forEach(empresa => {
+            
+            // A) CRIAÇÃO DO CARD DE TEXTO (INFERIOR)
+            const card = document.createElement('div');
+            card.className = 'company-select-card';
+            card.id = `card-${empresa.id}`;
+            card.innerHTML = `
+                <img src="${empresa.logo}" alt="Logo ${empresa.nome}" onerror="this.src='https://via.placeholder.com/150x80?text=${empresa.nome}'">
+                <h3>${empresa.nome}</h3>
+            `;
+            
+            // Clique no Card dispara a função principal passando TRUE para voar com o mapa
+            card.addEventListener('click', () => {
+                selecionarEmpresa(empresa.id, true);
+            });
+            gridEmpresas.appendChild(card);
+
+            // B) CRIAÇÃO DA ESTRUTURA DO PIN GEOMÉTRICO (MAPA)
+            // Cria os blocos de divs HTML que estruturamos no CSS para montar o marcador de gota
+            const htmlMarcador = `
+                <div class="pin-marker-container" id="pin-container-${empresa.id}">
+                    <div class="custom-pin">
+                        <div class="pin-circle">
+                            <img src="${empresa.logo}" onerror="this.src='https://via.placeholder.com/30x30?text=🚗'">
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Transforma o HTML de texto acima em um elemento de Ícone nativo do mapa (L.divIcon)
+            const iconePinGemetria = L.divIcon({
+                html: htmlMarcador,
+                className: '', // Limpa classes nativas para evitar conflitos com nosso design
+                iconSize: [50, 50],
+                iconAnchor: [25, 42], // Ajusta o ponto matemático do clique na ponta de baixo da gota
+                popupAnchor: [0, -45] // Define onde o balão de texto abrirá em relação ao pin
+            });
+
+            // Cria o marcador físico na coordenada da empresa e injeta o ícone geométrico personalizado
+            const marcador = L.marker(empresa.coordenadas, { icon: iconePinGemetria }).addTo(mapa);
+            
+            // Associa o balãozinho clássico (Popup) ao marcador
+            marcador.bindPopup(`
+                <img src="${empresa.logo}" alt="${empresa.nome}" style="max-height:35px; width:auto;" onerror="this.style.display='none'">
+                <strong>${empresa.nome}</strong>
+                <small style="display:block;color:#777;">Clique para alternar detalhes</small>
+            `);
+
+            // Clique no marcador do mapa dispara a função principal (FALSE para não balançar o mapa bruscamente)
+            marcador.on('click', () => {
+                selecionarEmpresa(empresa.id, false);
+            });
+
+            // Armazena a referência deste marcador associando ao ID da empresa
+            marcadoresMapa[empresa.id] = marcador;
+        });
+
+        // 12. FUNÇÃO CONTROLADORA PRINCIPAL (LÓGICA DE ABRIR / FECHAR / ALTERNAR)
+        function selecionarEmpresa(id, focarNoMapa = false) {
+            const painel = document.getElementById('painel-detalhes');
+
+            // --- CASO 1: O USUÁRIO CLICOU NA EMPRESA QUE JÁ ESTÁ ABERTA (TOGGLE OFF) ---
+            if (empresaAtivaId === id) {
+                // Remove o estilo ativo (borda azul) do card
+                document.getElementById(`card-${id}`).classList.remove('active');
+                
+                // Remove a cor vermelha do Pin Geométrico no mapa
+                const containerPin = document.getElementById(`pin-container-${id}`);
+                if (containerPin) containerPin.classList.remove('pin-active');
+                
+                // Esconde fisicamente o painel inferior de informações
+                painel.style.display = 'none';
+                
+                // Fecha qualquer balãozinho aberto no mapa
+                mapa.closePopup();
+                
+                // Reseta a visão do mapa para o centro padrão de Teresina
+                mapa.setView([-5.08921, -42.8016], 13, { animate: true });
+                
+                // Limpa a variável de controle informando que nenhuma empresa está ativa
+                empresaAtivaId = null;
+                return; // Encerra a execução da função aqui
+            }
+
+            // --- CASO 2: O USUÁRIO CLICOU EM UMA EMPRESA NOVA (TOGGLE ON / ALTERNAR) ---
+            const empresa = empresas.find(e => e.id === id);
+            if (!empresa) return;
+
+            // Salva o ID desta nova empresa como a empresa ativa do sistema
+            empresaAtivaId = id;
+
+            // Limpa o destaque azul de TODOS os cards e aplica apenas no card que foi clicado
+            document.querySelectorAll('.company-select-card').forEach(c => c.classList.remove('active'));
+            document.getElementById(`card-${id}`).classList.add('active');
+
+            // Limpa a cor vermelha de TODOS os pins e aplica apenas no pin da empresa clicada
+            document.querySelectorAll('.pin-marker-container').forEach(p => p.classList.remove('pin-active'));
+            const containerPin = document.getElementById(`pin-container-${id}`);
+            if (containerPin) {
+                containerPin.classList.add('pin-active');
+            }
+
+            // INJEÇÃO DINÂMICA DE DADOS: Atualiza os textos do painel com os dados do objeto selecionado
+            document.getElementById('detalhe-nome').innerText = empresa.nome;
+            document.getElementById('detalhe-logo').src = empresa.logo;
+            document.getElementById('detalhe-logo').onerror = function() { this.src = 'https://via.placeholder.com/120x60?text=Logo'; };
+            document.getElementById('detalhe-descricao').innerText = empresa.descricao;
+            document.getElementById('detalhe-endereco').innerText = empresa.endereco;
+            document.getElementById('detalhe-telefone').innerText = empresa.telefone;
+            document.getElementById('detalhe-email').innerText = empresa.email;
+            
+            // Injeta a URL real de compartilhamento no botão do Google Maps
+            document.getElementById('detalhe-gmaps').href = empresa.gmaps;
+
+            // Limpa a lista anterior de produtos e reconstrói as tags <li> com os novos itens
+            const listaProdutos = document.getElementById('detalhe-produtos');
+            listaProdutos.innerHTML = '';
+            empresa.produtos.forEach(prod => {
+                const item = document.createElement('li');
+                item.innerText = prod;
+                listaProdutos.appendChild(item);
+            });
+
+            // Torna o painel visível na tela mudando o display para 'block'
+            painel.style.display = 'block';
+            
+            // Executa uma rolagem de tela suave (scroll) até o painel aparecer completamente na visão do usuário
+            painel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            // Sincronização do balão: Abre automaticamente o popup do marcador correspondente no mapa
+            if (marcadoresMapa[id]) {
+                marcadoresMapa[id].openPopup();
+                
+                // Se a função foi chamada a partir do card inferior, move a câmera do mapa até o local com zoom próximo (15)
+                if (focarNoMapa) {
+                    mapa.setView(empresa.coordenadas, 15, { animate: true });
+                }
+            }
+        }
+
+        // 13. RECURSO ADICIONAL DE USABILIDADE: CLIQUE FORA
+        // Monitora cliques no mapa base. Se o usuário clicar em uma área neutra (rua, rio, etc.), fecha o painel ativo
+        mapa.on('click', (e) => {
+            // Verifica se o alvo do clique foi o próprio mapa e não um marcador
+            if (e.originalEvent.target.id === 'mapa-geral' || e.originalEvent.target.classList.contains('leaflet-container')) {
+                if (empresaAtivaId !== null) {
+                    // Executa a função passando o ID ativo. Como ele já está ativo, o Caso 1 (Toggle Off) será executado fechando tudo.
+                    selecionarEmpresa(empresaAtivaId);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
